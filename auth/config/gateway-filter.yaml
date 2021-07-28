@@ -1,0 +1,69 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: basic-auth
+  namespace: istio-system
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: envoy.http_connection_manager
+      proxy:
+        proxyVersion: ^1\.9.*
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: istio.auth
+        config_discovery:
+          config_source:
+            ads: {}
+            initial_fetch_timeout: 0s # wait indefinitely to prevent bad Wasm fetch
+          type_urls: [ "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"]
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: auth-config
+  namespace: istio-system
+spec:
+  configPatches:
+  - applyTo: EXTENSION_CONFIG
+    match:
+      context: GATEWAY
+    patch:
+      operation: ADD
+      value:
+        name: istio.auth
+        typed_config:
+          '@type': type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
+          value:
+            config:
+              configuration:
+                '@type': type.googleapis.com/google.protobuf.StringValue
+                value: |
+                  {
+                    "basic_auth_rules": [
+                      {
+                        "prefix": "/productpage",
+                        "request_methods":[ "GET", "POST" ],
+                        "credentials":[ "ok:test", "YWRtaW4zOmFkbWluMw==" ]
+                      }
+                    ]
+                  }
+              vm_config:
+                vm_id: auth
+                code:
+                  remote:
+                    http_uri:
+                      uri: http://raw.githubusercontent.com/auth.wasm
+                    # Optional: specifying checksum will let istio agent
+                    # verify the checksum of download artifacts. Missing
+                    # checksum will cause the Wasm module to be downloaded
+                    # repeatedly
+                    sha256: 6b0cecad751940eeedd68de5b9bcf940d0aac8bfc5f61c18d71985ee9460ee77
+                runtime: envoy.wasm.runtime.v8
