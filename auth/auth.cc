@@ -1,4 +1,4 @@
-#include "extensions/basic_auth/plugin.h"
+#include "auth/auth.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -56,6 +56,7 @@ bool extractBasicAuthRule(
 bool hostMatch(const PluginRootContext::BasicAuthConfigRule& rule,
                std::string_view request_host) {
     //检查请求的host
+    return true;
 }
 
 }  // namespace
