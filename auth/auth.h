@@ -1,6 +1,8 @@
 #include <assert.h>
 
 #include <string>
+#include <map>
+#include <mutex>
 #include <unordered_set>
 #define ASSERT(_X) assert(_X)
 
@@ -47,7 +49,9 @@ class PluginRootContext : public RootContext {
 
  private:
   bool configure(size_t);
-
+  std::map<std::string, std::string> v;
+  int count;
+  std::mutex _mu;
   // The following map holds information regarding the plugin's configuration
   // data. The key will hold the request_method (GET, POST, DELETE for example)
   // The value is a vector of structs holding request_path, match_pattern and

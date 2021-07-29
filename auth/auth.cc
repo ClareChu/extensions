@@ -1,5 +1,6 @@
 #include "auth/auth.h"
-
+#include <ctime>
+#include <string>
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "extensions/common/wasm/base64.h"
@@ -31,6 +32,14 @@ void deniedNoBasicAuthData(const std::string& realm) {
       401,
       "Request denied by Basic Auth check. No Basic "
       "Authentication information found.",
+      "", {{"WWW-Authenticate", absl::StrCat("Basic realm=", realm)}});
+}
+
+//响应大小
+void responseSizeToLarge(const std::string& realm) {
+  sendLocalResponse(
+      431,
+      "Response content-length to large.",
       "", {{"WWW-Authenticate", absl::StrCat("Basic realm=", realm)}});
 }
 
@@ -100,12 +109,27 @@ FilterHeadersStatus PluginRootContext::requestHeader() {
 
 
 FilterHeadersStatus PluginRootContext::responseHeaders() {
+  // time_t now = time(0);
+  // char* dt = ctime(&now);
+  
   addResponseHeader("hello", "world");
 
   LOG_WARN(absl::StrCat("add response success headers "));
 
   auto length = getResponseHeader("content-length")->toString();
-  
+  _mu.lock();
+  // 如果已经大于10000就直接上锁
+  if (count >= 10000) {
+    responseSizeToLarge(length);
+    return FilterHeadersStatus::StopIteration;
+  }
+  count = count+atoi(length.c_str());
+  if (count >= 10000) {
+    responseSizeToLarge(length);
+    return FilterHeadersStatus::StopIteration;
+  }
+  _mu.unlock();
+  //v.insert(std::map<std::string, std::string>::value_type(dt, "dt"));
   LOG_WARN(absl::StrCat("get response size :", length));
   return FilterHeadersStatus::Continue;
 }
